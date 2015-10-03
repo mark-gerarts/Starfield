@@ -5,9 +5,8 @@ var Starfield = function(canvas) {
     this.canvas = canvas;
     this.numberOfStars = 150;
     this.stars = [];
-    this.vmin = 30;
-    this.vmax = 45;
-    this.interval;
+    this.vmin = 50;
+    this.vmax = 75;
  
     this.draw = function() {
         //Clear previous stars
@@ -29,7 +28,7 @@ var Starfield = function(canvas) {
             if(this.stars[i].x <= 0) { //If the star has reached the side, spawn a new one
                 this.stars[i] = new Star(
                     this.canvas.width, //at the left side of the screen, x=0
-                    Math.random() * this.canvas.width, //random y-coordinate
+                    Math.random() * this.canvas.height, //random y-coordinate
                     Math.random() * 3 + 1, //size between 1 and 3
                     Math.floor(Math.random()*this.vmax) + this.vmin // Random value between vmin and vmax
                 );
@@ -50,10 +49,14 @@ var Starfield = function(canvas) {
         }
         _this.stars = stars;
         
-        _this.interval = setInterval(function() {
-            _this.draw();
-            _this.update();
-        }, 1000/_this.fps); //frequency (1/f)
+        function render() { 
+            setTimeout(function() {
+                requestAnimationFrame(render);
+                _this.update();
+                _this.draw();
+            }, 1000 / _this.fps);
+        }
+        render(); //Start rendering
     }(this);
 }
 
@@ -107,6 +110,9 @@ var Game = function(canvas) {
     this.objects = {
         rockets: []    
     },
+    //this.pressedKey = null    //Old way, max 1 input registered
+    this.pressedKeys = [];      //Array to track if multiple keys are being pressed
+                                //See http://stackoverflow.com/questions/5203407/javascript-multiple-keys-pressed-at-once
     this.draw = function() {
         this.canvas.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height) //reset
         
@@ -119,12 +125,32 @@ var Game = function(canvas) {
         this.canvas.ctx.fill(path);
     }
     this.update = function() {
-        
+        //Player movement
+        if(this.pressedKeys[38]) {
+            this.player.moveUp();
+        } 
+        if(this.pressedKeys[40]) {
+            this.player.moveDown();
+        }
+        if(this.pressedKeys[37]) {
+            this.player.moveLeft();
+        }
+        if(this.pressedKeys[39]) {
+            this.player.moveRight();
+        }
     }
     
-    this.start = function() {
+    var __construct = function(_this){
         
-    }
+        function render() {
+            setTimeout(function() {
+                requestAnimationFrame(render);
+                _this.update();
+                _this.draw();
+            }, 1000 / _this.fps);
+        }
+        render();
+    }(this)
 }
 
 var Player = function(gameWidth, gameHeight) {
@@ -134,7 +160,7 @@ var Player = function(gameWidth, gameHeight) {
     this.width = 80;
     this.x = 100;
     this.y = 100;
-    this.v = 500;
+    this.v = 200;
     this.moveUp = function() {
         this.y -= this.dt * this.v;
         if(this.y <= this.width/2) { //Stop when top is reached
@@ -145,6 +171,18 @@ var Player = function(gameWidth, gameHeight) {
         this.y += this.dt * this.v;
         if(this.y >= gameHeight - this.width/2) { //Stop when bottom is reached
             this.y = gameHeight - this.width/2;
+        }
+    }
+    this.moveLeft = function() {
+        this.x -= this.dt * this.v;
+        if(this.x <= 0) {
+            this.x = 0;
+        }
+    }
+    this.moveRight = function() {
+        this.x += this.dt * this.v;
+        if(this.x >= gameWidth - this.width) {
+            this.x = gameWidth - this.width;
         }
     }
     this.fire = function() {
@@ -160,28 +198,32 @@ var Rocket = function(x, y, v, damage) {
 }
 
 
+
+
+
+
+
 window.onload = function() {
     var starfielddiv = document.getElementById('starfield');
     var starfield = new Starfield(new StarfieldCanvas(starfielddiv));
     
     var gamediv = document.getElementById('game');
     var game = new Game(new GameCanvas(gamediv));
-    game.draw();
     
-    document.onkeydown = function(e) {
-        var keycode = e.keyCode;
-        switch(keycode) {
-            case 38:
-                //UP
-                game.player.moveUp();
-                game.draw();
-                break;
-            case 40:
-                //DOWN
-                game.player.moveDown();
-                game.draw();
-                break;
-        }
+    
+    
+    //Handle Input
+    document.addEventListener('keydown',    onkeydown,    false);
+    document.addEventListener('keyup',      onkeyup,      false);
+
+    function onkeydown(e) {
+        game.pressedKeys[e.keyCode] = true; //Sets the keycode
+        e.preventDefault();
+    }
+
+    function onkeyup(e) {
+        delete game.pressedKeys[e.keyCode]; //Offsets the keycode
+        e.preventDefault();
     }
 }
 
