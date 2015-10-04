@@ -103,6 +103,7 @@ var GameCanvas = function(containerdiv) {
         _this.height = containerdiv.clientHeight;
         
         var canvas = document.createElement('canvas');
+        canvas.className = 'gameCanvas';
         canvas.width = _this.width;
         canvas.height = _this.height;
         _this.ctx = canvas.getContext('2d');
@@ -131,6 +132,9 @@ var Game = function(canvas) {
     //this.pressedKey = null    //Old way, max 1 input registered
     this.pressedKeys = [];      //Now: Array to track if multiple keys are being pressed
                                 //See http://stackoverflow.com/questions/5203407/javascript-multiple-keys-pressed-at-once
+    this.clicked = false;
+    this.mouseX = 0;
+    this.mouseY = 0;
     this.draw = function() {
         this.canvas.ctx.beginPath();
         this.canvas.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height) //reset rect
@@ -179,18 +183,24 @@ var Game = function(canvas) {
     
     this.update = function() {
         //Player input
-        if(this.pressedKeys[38] || this.pressedKeys[90]) { //Arrow up or Z
-            this.player.moveUp();
-        } 
-        if(this.pressedKeys[40] || this.pressedKeys[83]) { //Arrow down or S
-            this.player.moveDown();
+        if(!this.clicked) { //To prevent 2x speed when using both inputs --ToDo: add desired controls in settings
+            //Keyboard movement
+            if(this.pressedKeys[38] || this.pressedKeys[90]) { //Arrow up or Z
+                this.player.moveUp();
+            } 
+            if(this.pressedKeys[40] || this.pressedKeys[83]) { //Arrow down or S
+                this.player.moveDown();
+            }
+            if(this.pressedKeys[37] || this.pressedKeys[81]) { //Arrow left or Q
+                this.player.moveLeft();
+            }
+            if(this.pressedKeys[39] || this.pressedKeys[68]) { //Arrow right or D
+                this.player.moveRight();
+            }    
+        } else { //Mouse movement
+            this.player.moveTo(this.mouseX, this.mouseY);
         }
-        if(this.pressedKeys[37] || this.pressedKeys[81]) { //Arrow left or Q
-            this.player.moveLeft();
-        }
-        if(this.pressedKeys[39] || this.pressedKeys[68]) { //Arrow right or D
-            this.player.moveRight();
-        }
+        
         if(this.pressedKeys[32]) { //space
             //fire: create rocket at player
             //Todo: limit firerate
@@ -233,7 +243,7 @@ var Game = function(canvas) {
         for(var i=0; i<this.objects.meteors.length; i++) {
             this.objects.meteors[i].x -= this.dt * this.objects.meteors[i].v;
             
-            if(this.objects.meteors[i].x <= 0) { //Meteor exits field
+            if(this.objects.meteors[i].x <= -100) { //Meteor exits field; the -100 is a quick fix until the sprites are adjusted
                 //Splice(index, amount)
                 //Set i-- to adjust for the spliced meteor
                 this.objects.meteors.splice(i--, 1);  
@@ -316,6 +326,33 @@ var Player = function(sprite, gameWidth, gameHeight) {
             this.x = gameWidth - this.width;
         }
     }
+    this.moveTo = function(x, y) {
+        //For mousecontrol
+        var centerx = this.x + this.width/2; //Get the center of the player (x)
+        var centery = this.y + this.height/2; //Get the center of the player (y)
+        //Vector calculations        
+        var deltaX = x - centerx;
+        var deltaY = y - centery;
+        var moveRight = (deltaX < 0) ? true : false; //Determine the direction for x-axis
+        var moveDown = (deltaY < 0) ? true : false; //y-axis
+        var rad = Math.atan2(deltaY, deltaX); //ArcTan2: gives the vector angle in radians
+        var v_x = this.v * Math.cos(rad); //Get the horizontal component
+        var v_y = this.v * Math.sin(rad); //Get the vertical component;
+        
+        this.x += this.dt * v_x; //move along the x-axis
+        if((moveRight && (this.x+this.width/2) <= x) || (!moveRight && (this.x+this.width/2) >= x)) {
+            //Check the direction along the x-axis && whether the current x-value is left or right of the target x-value
+            //This is done to prevent stuttering when the mouse is on the ship
+            this.x = x - this.width/2; //x value adjusted for the center
+        }
+        
+        this.y += this.dt * v_y; //Move along the y-axis
+        //See above
+        if((moveDown && (this.y+this.height/2) <= y) || (!moveDown && (this.y+this.height/2) >= y)) {
+            this.y = y - this.height/2;
+        }
+        
+    }
 }
 
 var Rocket = function(x, y, v, damage) {
@@ -336,18 +373,23 @@ var Meteor = function(sprite, x, y, v, width, height, health) {
     this.health = health;
 }
 
+
 window.onload = function() {
     var starfielddiv = document.getElementById('starfield');
     var starfield = new Starfield(new StarfieldCanvas(starfielddiv));
     
     var gamediv = document.getElementById('game');
     var game = new Game(new GameCanvas(gamediv));
-    
-    
-    
+        
     //Handle Input
+    //Keyboard
     document.addEventListener('keydown', onkeydown, false);
     document.addEventListener('keyup', onkeyup, false);
+    //Mouse
+    var cv = document.querySelector('.gameCanvas');
+    cv.addEventListener('mousedown', mousedown, false);
+    cv.addEventListener('mouseup', mouseup, false);
+    cv.addEventListener('mousemove', mousemove, false);
 
     function onkeydown(e) {
         game.pressedKeys[e.keyCode] = true; //Sets the keycode
@@ -357,5 +399,16 @@ window.onload = function() {
     function onkeyup(e) {
         delete game.pressedKeys[e.keyCode]; //Offsets the keycode
         e.preventDefault();
+    }
+    
+    function mousedown(e) {
+        game.clicked = true;
+    }
+    function mouseup(e) {
+        game.clicked = false;
+    }
+    function mousemove(e) {
+        game.mouseX = e.clientX;
+        game.mouseY = e.clientY;
     }
 }
