@@ -1,6 +1,10 @@
-//Inspired by: http://www.codeproject.com/Articles/642499/Learn-JavaScript-Part-1-Create-a-Starfield
-
+/********************
+ *                  *
+ *     BG LOGIC     *
+ *                  *
+ ********************/
 var Starfield = function(canvas) {
+    //Inspired by: http://www.codeproject.com/Articles/642499/Learn-JavaScript-Part-1-Create-a-Starfield
     this.fps = 30;
     this.dt = 1 / this.fps;
     this.canvas = canvas;
@@ -84,7 +88,12 @@ var StarfieldCanvas = function(containerdiv) {
     }(this);
 }
 
-/* Game logic */
+/********************
+ *                  *
+ *    GAME LOGIC    *
+ *                  *
+ ********************/
+
 var GameCanvas = function(containerdiv) {
     this.width = 0;
     this.height = 0;
@@ -108,17 +117,17 @@ var Game = function(canvas) {
         maxNumberOfMeteors: 5,
         meteorSpawnChance: 0.05,
         meteorMinV: 100,
-        meteorMaxV: 200
+        meteorMaxV: 200,
+        meteorWidth: 64
     }
+    this.meteorSprites = [];
     this.dt = 1 / this.settings.fps;
     this.canvas = canvas;
-    this.player = new Player(canvas.width, canvas.height);
+    this.player;
     this.objects = { //might add more objects
         rockets: [],
         meteors: []
     };
-    //TESTING: sprites
-    this.testSprite;
     //this.pressedKey = null    //Old way, max 1 input registered
     this.pressedKeys = [];      //Now: Array to track if multiple keys are being pressed
                                 //See http://stackoverflow.com/questions/5203407/javascript-multiple-keys-pressed-at-once
@@ -127,13 +136,18 @@ var Game = function(canvas) {
         this.canvas.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height) //reset rect
         this.canvas.ctx.closePath();
         
-        //Draw the player(triangle)
-        this.canvas.ctx.fillStyle = '#F00';
-        var path = new Path2D();
-        path.moveTo(this.player.x + this.player.width, this.player.y); //Point of the triangle
-        path.lineTo(this.player.x, this.player.y + this.player.width/2); //Bottom of triangle
-        path.lineTo(this.player.x, this.player.y - this.player.width/2); //Top of triangle
-        this.canvas.ctx.fill(path);
+        //Draw the player
+        this.canvas.ctx.drawImage(
+            this.player.sprite, //Image
+            0, //src x
+            0, ///src y
+            this.player.width, //src width
+            this.player.height, //src height,
+            this.player.x, //x
+            this.player.y, //y
+            this.player.width, //Destination width
+            this.player.height //Destination height
+        );
         
         //Draw the rockets
         for(var i=0; i<this.objects.rockets.length; i++) {
@@ -148,33 +162,19 @@ var Game = function(canvas) {
         
         //Draw the meteors
         for(var i=0; i<this.objects.meteors.length; i++) {
-            var path = this.canvas.ctx;
-            path.fillStyle = '#371C00';
-            path.arc(
-                this.objects.meteors[i].x, //x of center
-                this.objects.meteors[i].y, //y of center
-                this.objects.meteors[i].radius, //radius
-                0, //starting angle (in rad)
-                2*Math.PI, //ending angle
-                false //counterclokcwise = false
+            var meteor = this.objects.meteors[i]; //Create temp var
+            this.canvas.ctx.drawImage(
+                meteor.sprite, //Image
+                0, //src x
+                0, ///src y
+                meteor.width, //src width
+                meteor.height, //src height,
+                meteor.x, //x
+                meteor.y, //y
+                meteor.width*2, //Destination width
+                meteor.height*2 //Destination height
             );
-            path.fill();
-            path.closePath();
         }
-        
-        //spritetests
-        var ctx = this.canvas.ctx;
-        ctx.drawImage(
-            this.testSprite.img,
-            0,
-            0,
-            this.testSprite.width,
-            this.testSprite.height,
-            100,
-            100,
-            this.testSprite.width,
-            this.testSprite.height
-        );
     }
     
     this.update = function() {
@@ -195,8 +195,8 @@ var Game = function(canvas) {
             //fire: create rocket at player
             //Todo: limit firerate
             this.objects.rockets.push(new Rocket(
-                this.player.x + this.player.width, //x of the top of the triangle
-                this.player.y, //y
+                this.player.x + this.player.width/2, //x at the right side of the player
+                this.player.y + this.player.height/2, //y at center of player
                 1000, //velocity ToDo: set default velocity
                 50 //damage
             ));
@@ -218,10 +218,12 @@ var Game = function(canvas) {
             var r = Math.random();
             if(r < this.settings.meteorSpawnChance) { 
                 this.objects.meteors.push(new Meteor(
+                    this.meteorSprites[Math.floor(Math.random()*this.meteorSprites.length)],
                     this.canvas.width, //Spawn at right side
-                    Math.random() * this.canvas.height, //random y
+                    (Math.random() * this.canvas.height +this.settings.meteorWidth) - this.settings.meteorWidth, //random y
                     Math.floor(Math.random()*this.settings.meteorMaxV) + this.settings.meteorMinV, //velocity brtween vmin & vmax
-                    25, //radius
+                    this.settings.meteorWidth, //meteor width
+                    this.settings.meteorWidth, //Height (=width)
                     100 //hp
                 ));
             }
@@ -241,21 +243,33 @@ var Game = function(canvas) {
     
     var __construct = function(_this){
         //Add sprites
-        var testSpriteImg = new Image();
-        testSpriteImg.src = "images/ship.png";
+        var playerSprite = new Image();
+        playerSprite.src = "images/ship.png"; //img source: http://opengameart.org/content/spaceship-9
+         _this.player = new Player(playerSprite, canvas.width, canvas.height);
         
-        var testSprite = sprite({
-            width: 45,
-            height: 31,
-            img: testSpriteImg
-        })
+        //Meteors src=http://opengameart.org/content/asteroids
+        //ToDO: make spritesheet
+        var meteorSprite1 = new Image();
+        meteorSprite1.src = "images/asteroids/1.png";
+        _this.meteorSprites.push(meteorSprite1);
         
-        _this.testSprite = testSprite;
-        console.log(testSprite);
+        var meteorSprite2 = new Image();
+        meteorSprite2.src = "images/asteroids/2.png";
+        _this.meteorSprites.push(meteorSprite2);
         
+        var meteorSprite3 = new Image();
+        meteorSprite3.src = "images/asteroids/3.png";
+        _this.meteorSprites.push(meteorSprite3);
         
+        var meteorSprite4 = new Image();
+        meteorSprite4.src = "images/asteroids/4.png";
+        _this.meteorSprites.push(meteorSprite4);
         
+        var meteorSprite5 = new Image();
+        meteorSprite5.src = "images/asteroids/5.png";
+        _this.meteorSprites.push(meteorSprite5);
         
+
         function render() {
             setTimeout(function() {
                 requestAnimationFrame(render);
@@ -267,24 +281,27 @@ var Game = function(canvas) {
     }(this)
 }
 
-var Player = function(gameWidth, gameHeight) {
+var Player = function(sprite, gameWidth, gameHeight) {
+    //!Player coordinates are measured from the top left corner
+    this.sprite = sprite,
     this.fps = 30;
     this.dt = 1 / this.fps;
     this.lives = 3;
-    this.width = 80;
-    this.x = 100;
-    this.y = 100;
+    this.width = 31;
+    this.height = 45;
+    this.x = 100; //Start x-coordinate  
+    this.y = gameHeight/2 - this.height/2; //Start y-coordinate (Center) 
     this.v = 500;
     this.moveUp = function() {
         this.y -= this.dt * this.v;
-        if(this.y <= this.width/2) { //Stop when top is reached
-            this.y = this.width/2;
+        if(this.y <= 0) { //Stop when top is reached
+            this.y = 0;
         }
     }
     this.moveDown = function() {
         this.y += this.dt * this.v;
-        if(this.y >= gameHeight - this.width/2) { //Stop when bottom is reached
-            this.y = gameHeight - this.width/2;
+        if(this.y >= gameHeight - this.height) { //Stop when bottom is reached
+            this.y = gameHeight - this.height;
         }
     }
     this.moveLeft = function() {
@@ -309,30 +326,14 @@ var Rocket = function(x, y, v, damage) {
     this.damage = damage;
 }
 
-var Meteor = function(x, y, v, radius, health) {
-    this.x = x;
-    this.y = y;
-    this.v = v;
-    this.radius = radius;
-    this.health = health;
-}
-
-var TestSprite = function(sprite, x, y) {
+var Meteor = function(sprite, x, y, v, width, height, health) {
     this.sprite = sprite;
     this.x = x;
     this.y = y;
-    this.width = sprite.width;
-    this.height = sprite.height;
-}
-
-function sprite(options) {
-    var output = {};
-    
-    output.width = options.width;
-    output.height = options.height;
-    output.img = options.img;
-    
-    return output;
+    this.v = v;
+    this.width = width;
+    this.height = height;
+    this.health = health;
 }
 
 window.onload = function() {
