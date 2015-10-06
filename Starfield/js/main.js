@@ -3,6 +3,7 @@
  *     BG LOGIC     *
  *                  *
  ********************/
+
 var Starfield = function(canvas) {
     //Inspired by: http://www.codeproject.com/Articles/642499/Learn-JavaScript-Part-1-Create-a-Starfield
     this.fps = 30;
@@ -12,6 +13,7 @@ var Starfield = function(canvas) {
     this.stars = [];
     this.vmin = 50;
     this.vmax = 75;
+    this.interval = 0;
  
     this.draw = function() {
         //Clear previous stars
@@ -39,6 +41,15 @@ var Starfield = function(canvas) {
         }
     }
     
+    this.stop = function() {
+        console.log('bg stopped');
+        clearTimeout(this.interval);
+    }
+    
+    this.start = function() {
+        
+    }
+    
     var __construct = function(_this) { //constructor
         //Create the stars
         var stars = [];
@@ -53,7 +64,7 @@ var Starfield = function(canvas) {
         _this.stars = stars;
         
         function render() { 
-            setTimeout(function() {
+            _this.interval = setTimeout(function() {
                 requestAnimationFrame(render);
                 _this.update();
                 _this.draw();
@@ -74,7 +85,7 @@ var StarfieldCanvas = function(containerdiv) {
     this.width = 0;
     this.height = 0;
     this.ctx = null;
-    var __construct = function(_this) { //Constructor function, ES6 not supported        
+    var __construct = function(_this) { //Constructor function        
         _this.width = containerdiv.clientWidth;
         _this.height = containerdiv.clientHeight;
         
@@ -112,25 +123,32 @@ var GameCanvas = function(containerdiv) {
     }(this);
 }
 
-var Game = function(canvas) {
+var Game = function(canvas, bg) {
+    this.bg = bg;
     this.settings = {
         fps: 30,
+        //Meteors
         maxNumberOfMeteors: 5,
-        meteorSpawnChance: 0.05,
+        meteorSpawnChance: 0.03,
         meteorMinV: 100,
         meteorMaxV: 200,
-        meteorWidth: 64
+        meteorWidth: 120,
+        //Enemies
+        maxNumberOfEnemies: 3,
+        enemySpawnChance: 0.01,
+        
     }
     this.meteorSprites = [];
+    this.explosionSprites = [];
     this.dt = 1 / this.settings.fps;
     this.canvas = canvas;
     this.player;
     this.objects = { //might add more objects
         rockets: [],
-        meteors: []
+        meteors: [],
+        explosions: []
     };
-    //this.pressedKey = null    //Old way, max 1 input registered
-    this.pressedKeys = [];      //Now: Array to track if multiple keys are being pressed
+    this.pressedKeys = [];      //Array to track if multiple keys are being pressed
                                 //See http://stackoverflow.com/questions/5203407/javascript-multiple-keys-pressed-at-once
     this.clicked = false;
     this.mouseX = 0;
@@ -151,7 +169,9 @@ var Game = function(canvas) {
             this.player.y, //y
             this.player.width, //Destination width
             this.player.height //Destination height
-        );
+        );    
+        
+        
         
         //Draw the rockets
         for(var i=0; i<this.objects.rockets.length; i++) {
@@ -175,8 +195,24 @@ var Game = function(canvas) {
                 meteor.height, //src height,
                 meteor.x, //x
                 meteor.y, //y
-                meteor.width*2, //Destination width
-                meteor.height*2 //Destination height
+                meteor.width, //Destination width
+                meteor.height //Destination height
+            );
+        }
+        
+        //Draw the explosions
+        for(var i=0; i<this.objects.explosions.length; i++) {
+            var explosion = this.objects.explosions[i]; //Create temp var
+            this.canvas.ctx.drawImage(
+                explosion.spritesheet, //Image
+                0, //src x of current frame
+                explosion.currentSprite * explosion.height, ///src y
+                explosion.width, //src width
+                explosion.height, //src height,
+                explosion.x, //x
+                explosion.y, //y
+                explosion.width, //Destination width
+                explosion.height //Destination height
             );
         }
     }
@@ -243,14 +279,51 @@ var Game = function(canvas) {
         for(var i=0; i<this.objects.meteors.length; i++) {
             this.objects.meteors[i].x -= this.dt * this.objects.meteors[i].v;
             
+            //Check for collision
+            if(this.player.x + this.player.width >= this.objects.meteors[i].x && this.player.x <= this.objects.meteors[i].x + this.objects.meteors[i].width) { //Check x
+                if(this.player.y + this.player.height >= this.objects.meteors[i].y && this.player.y <= this.objects.meteors[i].y + this.objects.meteors[i].height) { //Check y
+                    if(this.objects.explosions.length < 1) { //ToDO: allow multiple explosions
+                        this.objects.explosions.push(new Explosion( //Explosion = function(spritesheet, x, y, width)
+                            this.explosionSprites[0], //only 1 sheet atm
+                            this.player.x + this.player.width/2, //Center of player X
+                            this.player.y + this.player.height/2, //Center y
+                            81,
+                            117
+                        ));
+                    }
+                    
+                }
+            }
+            
             if(this.objects.meteors[i].x <= -100) { //Meteor exits field; the -100 is a quick fix until the sprites are adjusted
                 //Splice(index, amount)
                 //Set i-- to adjust for the spliced meteor
                 this.objects.meteors.splice(i--, 1);  
             }
         }
+        
+        if(this.objects.explosions.length >= 1) {//ToDO: Don't track collison by explosion
+            this.player.lives = 0;
+            this.bg.stop();
+        }
+        for(var i=0; i<this.objects.explosions.length; i++) {
+            if(this.objects.explosions[i].currentSprite < this.objects.explosions[i].numberOfSprites) {
+                this.objects.explosions[i].currentSprite++; //Advance in the spritesheet
+            } else {
+                //Delete the explosion
+                this.objects.explosions.splice(i--, 1); 
+            }
+        }
+
+        
     }
     
+    this.start = function() {
+        //ToDO
+    }
+    this.stop = function() {
+        //ToDO
+    }
     var __construct = function(_this){
         //Add sprites
         var playerSprite = new Image();
@@ -279,6 +352,9 @@ var Game = function(canvas) {
         meteorSprite5.src = "images/asteroids/5.png";
         _this.meteorSprites.push(meteorSprite5);
         
+        var explosionSpriteSheet1 = new Image();
+        explosionSpriteSheet1.src = "images/explosions/explosion1.png";
+        _this.explosionSprites.push(explosionSpriteSheet1);
 
         function render() {
             setTimeout(function() {
@@ -328,6 +404,19 @@ var Player = function(sprite, gameWidth, gameHeight) {
     }
     this.moveTo = function(x, y) {
         //For mousecontrol
+        
+        //to prevent the ship going offscreen
+        if(x < this.width/2) {
+            x = this.width/2; //Left
+        } else if(x > gameWidth - this.width/2) {
+            x = gameWidth - this.width/2; //Right
+        }
+        if(y < this.height/2) {
+            y = this.height/2; //Top
+        } else if(y > gameHeight - this.height/2) {
+            y = gameHeight - this.height/2; //Bottom
+        }       
+        
         var centerx = this.x + this.width/2; //Get the center of the player (x)
         var centery = this.y + this.height/2; //Get the center of the player (y)
         //Vector calculations        
@@ -351,7 +440,6 @@ var Player = function(sprite, gameWidth, gameHeight) {
         if((moveDown && (this.y+this.height/2) <= y) || (!moveDown && (this.y+this.height/2) >= y)) {
             this.y = y - this.height/2;
         }
-        
     }
 }
 
@@ -373,14 +461,34 @@ var Meteor = function(sprite, x, y, v, width, height, health) {
     this.health = health;
 }
 
+var Explosion = function(spritesheet, x, y, width, height) {
+    this.spritesheet = spritesheet;
+    this.numberOfSprites = 8;
+    this.currentSprite = 0;
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+}
 
+var Enemy = function(spritesheet, x, y, width, height, health) {
+    this.spritesheet = spritesheet;
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.health = health;
+}
+
+var starfield;
+var game;
 window.onload = function() {
     var starfielddiv = document.getElementById('starfield');
-    var starfield = new Starfield(new StarfieldCanvas(starfielddiv));
+    starfield = new Starfield(new StarfieldCanvas(starfielddiv));
     
     var gamediv = document.getElementById('game');
-    var game = new Game(new GameCanvas(gamediv));
-        
+    game = new Game(new GameCanvas(gamediv), starfield);
+    
     //Handle Input
     //Keyboard
     document.addEventListener('keydown', onkeydown, false);
